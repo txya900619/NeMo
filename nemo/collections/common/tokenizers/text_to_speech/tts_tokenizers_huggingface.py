@@ -13,15 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 from typing import List
 
 from datasets import load_dataset
 
-from nemo.collections.common.tokenizers.text_to_speech.tokenizer_utils import (
-    chinese_text_preprocessing,
-)
+from nemo.collections.common.tokenizers.text_to_speech.tokenizer_utils import chinese_text_preprocessing
 from nemo.collections.common.tokenizers.text_to_speech.tts_tokenizers import BaseTokenizer
 from nemo.utils import logging
+
 
 def ipa_string_to_phoneme(ipa: str, tone_prefix=None) -> List[str]:
         """Converts an IPA string to a list of phonemes and tones.
@@ -96,6 +96,7 @@ class HakkaPhonemesTokenizer(BaseTokenizer):
         """
         tokens = []
         self.space, tokens = len(tokens), tokens + [space]  # Space
+        self.datasets_num_proc = 8
 
         if silence is not None:
             self.silence, tokens = len(tokens), tokens + [silence]  # Silence
@@ -104,9 +105,9 @@ class HakkaPhonemesTokenizer(BaseTokenizer):
 
         if tokens_path is not None:
             with open(tokens_path, "r", encoding="utf-8") as f:
-                self.tokens = f.read().splitlines()
+                tokens = f.read().splitlines()
         elif dataset_name is not None and split_name is not None:
-            self.tokens.extend(self.generate_tokens(dataset_name, split_name))
+            tokens.extend(self.generate_tokens(dataset_name, split_name))
 
             self.text_preprocessing_func = text_preprocessing_func
 
@@ -139,12 +140,15 @@ class HakkaPhonemesTokenizer(BaseTokenizer):
         # Only keep the ipa column
         dataset = dataset.select_columns("ipa")
 
+        tag_regex = re.compile(r"<\S*>")
+        dataset = dataset.filter(lambda example: tag_regex.search(example["ipa"]) is None, num_proc=self.datasets_num_proc)
+
         # Examples: "a_24 t͡ɕ i_31" -> ["a", "#24", "t͡ɕ", "i", "#31"] (if tone_prefix is "#")
         dataset = dataset.map(
             lambda example: {
                 "ipa": ipa_string_to_phoneme(example["ipa"], tone_prefix=self.tone_prefix),
             },
-            num_proc=4,
+            num_proc=self.datasets_num_proc,
         )
 
 
@@ -158,7 +162,7 @@ class HakkaPhonemesTokenizer(BaseTokenizer):
 
     def encode(self, text: str) -> List[int]:
         """See base class for more information."""
-        text = self.text_preprocessing_func(text)
+        # text = self.text_preprocessing_func(text) # ipa don't need this (?)
         phonemes = ipa_string_to_phoneme(text, tone_prefix=self.tone_prefix)
 
         ps, space, tokens = [], self.tokens[self.space], set(self.tokens)

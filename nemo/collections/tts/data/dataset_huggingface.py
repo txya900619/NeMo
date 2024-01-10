@@ -17,6 +17,7 @@ import math
 import os
 import pickle
 import random
+import re
 from collections import defaultdict
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Union
@@ -181,6 +182,8 @@ class TTSDataset(Dataset):
         # Initialize text tokenizer
         self.text_tokenizer = text_tokenizer
 
+        self.datasets_num_proc = 8
+
         self.phoneme_probability = None
         if isinstance(self.text_tokenizer, BaseTokenizer):
             self.text_tokenizer_pad_id = text_tokenizer.pad
@@ -215,24 +218,26 @@ class TTSDataset(Dataset):
 
         data: datasets.Dataset = load_dataset(dataset_name, split=split_name)
 
-        data = data.map(lambda example: {"lengths": (example["audio"]["array"].size*2 + 78) // (n_fft // 2)})
+        tag_regex = re.compile(r"<\S*>")
+        data = data.filter(lambda example: tag_regex.search(example["ipa"]) is None, num_proc=self.datasets_num_proc)
+
+        data = data.map(lambda example: {"lengths": (example["audio"]["array"].size*2 + 78) // (n_fft // 2)}, num_proc=self.datasets_num_proc)
 
         # Initialize and read manifest file(s), filter out data by duration and ignore_file, compute base dir
         self.lengths = data["lengths"]  # Needed for BucketSampling
 
         if self.cache_text:
-            data = data.map(lambda example: {"text_tokens":self.text_tokenizer(example["ipa"])})
+            data = data.map(lambda example: {"text_tokens":self.text_tokenizer(example["ipa"])}, num_proc=self.datasets_num_proc)
 
-        if "duraion" not in data.column_names:
+        if "duration" not in data.column_names:
             logging.info(
                             "Not all audio files have duration information. Duration logging will be disabled."
                         )
             total_duration = None
         else:
-            data = data.filter(lambda example: (min_duration and example["duration"] < min_duration) or (
-                    max_duration and example["duration"] > max_duration))
+            data = data.filter(lambda example: (min_duration and example["duration"] >= min_duration) or (
+                    max_duration and example["duration"] <= max_duration))
             total_duration = sum(data["duration"])
-            
 
         logging.info(f"Loaded dataset with {len(data)} files.")
         if total_duration is not None:
