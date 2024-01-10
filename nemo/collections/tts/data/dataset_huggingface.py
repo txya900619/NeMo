@@ -221,31 +221,36 @@ class TTSDataset(Dataset):
         tag_regex = re.compile(r"<\S*>")
         data = data.filter(lambda example: tag_regex.search(example["ipa"]) is None, num_proc=self.datasets_num_proc)
 
-        data = data.map(lambda example: {"lengths": (example["audio"]["array"].size*2 + 78) // (n_fft // 2)}, num_proc=self.datasets_num_proc)
+        data = data.map(
+            lambda example: {"lengths": (example["audio"]["array"].size * 2 + 78) // (n_fft // 2)},
+            num_proc=self.datasets_num_proc,
+        )
 
         # Initialize and read manifest file(s), filter out data by duration and ignore_file, compute base dir
         self.lengths = data["lengths"]  # Needed for BucketSampling
 
         if self.cache_text:
-            data = data.map(lambda example: {"text_tokens":self.text_tokenizer(example["ipa"])}, num_proc=self.datasets_num_proc)
+            data = data.map(
+                lambda example: {"text_tokens": self.text_tokenizer(example["ipa"])}, num_proc=self.datasets_num_proc
+            )
 
         if "duration" not in data.column_names:
-            logging.info(
-                            "Not all audio files have duration information. Duration logging will be disabled."
-                        )
+            logging.info("Not all audio files have duration information. Duration logging will be disabled.")
             total_duration = None
         else:
-            data = data.filter(lambda example: (min_duration and example["duration"] >= min_duration) or (
-                    max_duration and example["duration"] <= max_duration))
+            data = data.filter(
+                lambda example: (min_duration and example["duration"] >= min_duration)
+                or (max_duration and example["duration"] <= max_duration)
+            )
             total_duration = sum(data["duration"])
 
         logging.info(f"Loaded dataset with {len(data)} files.")
         if total_duration is not None:
             logging.info(f"Dataset contains {total_duration / 3600:.2f} hours.")
-        
+
         # self.data = TTSDataset.filter_files(data, ignore_file, min_duration, max_duration, total_duration)
         self.data = data
-        
+
         # self.base_data_dir = get_base_dir([item["audio_filepath"] for item in self.data])
 
         # Initialize audio and mel related parameters
@@ -494,7 +499,10 @@ class TTSDataset(Dataset):
                 start = random.randint(0, sample["audio"]["array"].shape[0] - n_segments)
                 sample["audio"]["array"] = sample["audio"]["array"][start : start + n_segments]
             features = AudioSegment(
-                sample["audio"]["array"], sample_rate=sample["audio"]["sampling_rate"], target_sr=self.sample_rate, trim=self.trim
+                sample["audio"]["array"],
+                sample_rate=sample["audio"]["sampling_rate"],
+                target_sr=self.sample_rate,
+                trim=self.trim,
             )
             audio_shifted = None
 
@@ -645,7 +653,7 @@ class TTSDataset(Dataset):
         if ReferenceAudio in self.sup_data_types_set:
             reference = self.get_reference_for_sample(sample)
             reference_audio = self.featurizer.process(
-                reference["audio_filepath"], # cant process file path
+                reference["audio_filepath"],  # cant process file path
                 trim=self.trim,
                 trim_ref=self.trim_ref,
                 trim_top_db=self.trim_top_db,

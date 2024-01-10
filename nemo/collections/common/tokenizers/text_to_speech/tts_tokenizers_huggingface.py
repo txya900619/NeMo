@@ -24,28 +24,28 @@ from nemo.utils import logging
 
 
 def ipa_string_to_phoneme(ipa: str, tone_prefix=None) -> List[str]:
-        """Converts an IPA string to a list of phonemes and tones.
+    """Converts an IPA string to a list of phonemes and tones.
         Args:
             ipa: IPA string, e.g. "a_24 t͡ɕ i_31"
             tone_prefix: Prefix for tone symbols, e.g. "#" for "#24" and "#31"
         Examples: "a_24 t͡ɕ i_31" -> ["a", "#24", "t͡ɕ", "i", "#31"] (if tone_prefix is "#")
         """
-        if tone_prefix is None:
-            tone_prefix = ""
+    if tone_prefix is None:
+        tone_prefix = ""
 
-        phonemes = []
+    phonemes = []
 
-        for phoneme_with_tone in ipa.split(" "):
-            split_phoneme_and_tone = phoneme_with_tone.split("_")
+    for phoneme_with_tone in ipa.split(" "):
+        split_phoneme_and_tone = phoneme_with_tone.split("_")
 
-            if len(split_phoneme_and_tone) == 2:
-                phoneme, tone = split_phoneme_and_tone
-                phonemes.append(phoneme)
-                phonemes.append(f"{tone_prefix}{tone}")
-            else:
-                phonemes.append(split_phoneme_and_tone[0])
-        
-        return phonemes
+        if len(split_phoneme_and_tone) == 2:
+            phoneme, tone = split_phoneme_and_tone
+            phonemes.append(phoneme)
+            phonemes.append(f"{tone_prefix}{tone}")
+        else:
+            phonemes.append(split_phoneme_and_tone[0])
+
+    return phonemes
 
 
 class HakkaPhonemesTokenizer(BaseTokenizer):

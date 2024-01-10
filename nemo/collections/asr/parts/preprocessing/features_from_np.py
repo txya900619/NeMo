@@ -45,6 +45,7 @@ from nemo.collections.asr.parts.preprocessing.perturb import AudioAugmentor
 from nemo.collections.asr.parts.preprocessing.segment import AudioSegment
 from nemo.utils import logging
 
+
 class WaveformFeaturizer(object):
     def __init__(self, sample_rate=16000, augmentor=None):
         self.augmentor = augmentor if augmentor is not None else AudioAugmentor()
@@ -69,7 +70,7 @@ class WaveformFeaturizer(object):
         normalize_db=None,
     ):
         audio = AudioSegment(
-            samples[min(offset, samples.size):max(offset + duration*sample_rate, samples.size)],
+            samples[min(offset, samples.size) : max(offset + duration * sample_rate, samples.size)],
             sample_rate=sample_rate,
             target_sr=self.sample_rate,
             trim=trim,
