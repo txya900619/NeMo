@@ -22,28 +22,40 @@ from nemo.collections.common.tokenizers.text_to_speech.tokenizer_utils import ch
 from nemo.collections.common.tokenizers.text_to_speech.tts_tokenizers import BaseTokenizer
 from nemo.utils import logging
 
-
-def ipa_string_to_phoneme(ipa: str, tone_prefix=None) -> List[str]:
+def ipa_string_to_phoneme(ipa: str, tone_prefix=None, phoneme_sep=None) -> List[str]:
     """Converts an IPA string to a list of phonemes and tones.
         Args:
             ipa: IPA string, e.g. "a_24 t͡ɕ i_31"
             tone_prefix: Prefix for tone symbols, e.g. "#" for "#24" and "#31"
-        Examples: "a_24 t͡ɕ i_31" -> ["a", "#24", "t͡ɕ", "i", "#31"] (if tone_prefix is "#")
-        """
+            phoneme_sep: if not None, replace this special character with space before splitting
+        Examples: "a_24 t͡ɕ i_31" -> ["a", "#24", " ", "t", "͡", "ɕ", " ", "i", "#31"] (if tone_prefix is "#")
+    """
     if tone_prefix is None:
         tone_prefix = ""
 
+    if phoneme_sep is not None:
+        ipa = ipa.replace(phoneme_sep, ' ')
+
     phonemes = []
 
-    for phoneme_with_tone in ipa.split(" "):
+    for phoneme_with_tone in ipa.split(' '):
         split_phoneme_and_tone = phoneme_with_tone.split("_")
 
         if len(split_phoneme_and_tone) == 2:
             phoneme, tone = split_phoneme_and_tone
-            phonemes.append(phoneme)
+            # phonemes.append(phoneme)
+            phonemes.extend(phoneme) # one phoneme
             phonemes.append(f"{tone_prefix}{tone}")
         else:
-            phonemes.append(split_phoneme_and_tone[0])
+            # phonemes.append(split_phoneme_and_tone[0])
+            phonemes.extend(split_phoneme_and_tone[0]) # one phoneme
+
+        # one phoneme
+        phonemes.append(' ')
+
+    # Remove trailing space
+    if phonemes[-1] == " ":
+        phonemes.pop()
 
     return phonemes
 
@@ -122,7 +134,7 @@ class HakkaPhonemesTokenizer(BaseTokenizer):
                 tokens.extend(self.PUNCT_LIST)
 
             if save_path is not None:
-                with open(save_path, "w") as f:
+                with open(save_path, "w", encoding="utf-8") as f:
                     f.write("\n".join(tokens))
         else:
             raise ValueError("Either tokens_path or dataset_name and split_name must be provided.")
@@ -140,13 +152,13 @@ class HakkaPhonemesTokenizer(BaseTokenizer):
         # Only keep the ipa column
         dataset = dataset.select_columns("ipa")
 
-        tag_regex = re.compile(r"<\S*>")
-        dataset = dataset.filter(lambda example: tag_regex.search(example["ipa"]) is None, num_proc=self.datasets_num_proc)
+        # tag_regex = re.compile(r"<\S*>")
+        dataset = dataset.filter(lambda example: example["ipa"] is not None, num_proc=self.datasets_num_proc)
 
-        # Examples: "a_24 t͡ɕ i_31" -> ["a", "#24", "t͡ɕ", "i", "#31"] (if tone_prefix is "#")
+        # Examples: "a_24 t͡ɕ i_31" -> ["a", "#24", " ", "t", "͡", "ɕ", " ", "i", "#31"]] (if tone_prefix is "#")
         dataset = dataset.map(
             lambda example: {
-                "ipa": ipa_string_to_phoneme(example["ipa"], tone_prefix=self.tone_prefix),
+                "ipa": ipa_string_to_phoneme(example["ipa"], tone_prefix=self.tone_prefix, phoneme_sep="-"),
             },
             num_proc=self.datasets_num_proc,
         )
@@ -155,15 +167,19 @@ class HakkaPhonemesTokenizer(BaseTokenizer):
         tokens = set()
         for example in dataset:
             ipa = example["ipa"]
+
             tokens.update(ipa)
-        
+
+        if " " in tokens:
+            tokens.remove(" ")
+                    
         return sorted(tokens)
 
 
     def encode(self, text: str) -> List[int]:
         """See base class for more information."""
         # text = self.text_preprocessing_func(text) # ipa don't need this (?)
-        phonemes = ipa_string_to_phoneme(text, tone_prefix=self.tone_prefix)
+        phonemes = ipa_string_to_phoneme(text, tone_prefix=self.tone_prefix, phoneme_sep="-")
 
         ps, space, tokens = [], self.tokens[self.space], set(self.tokens)
         for p in phonemes:  # noqa
