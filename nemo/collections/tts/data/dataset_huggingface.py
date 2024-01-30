@@ -218,6 +218,8 @@ class TTSDataset(Dataset):
 
         data: datasets.Dataset = load_dataset(dataset_name, split=split_name)
 
+        data = data.filter(lambda example: example["ipa"] is not None, num_proc=self.datasets_num_proc)
+
         tag_regex = re.compile(r"<\S*>")
         data = data.filter(lambda example: tag_regex.search(example["ipa"]) is None, num_proc=self.datasets_num_proc)
 
@@ -247,6 +249,22 @@ class TTSDataset(Dataset):
         logging.info(f"Loaded dataset with {len(data)} files.")
         if total_duration is not None:
             logging.info(f"Dataset contains {total_duration / 3600:.2f} hours.")
+
+        # for hakka dict, add speaker id if needed
+        if sup_data_types is not None and SpeakerID.name in sup_data_types:
+            if dataset_name == "formocorpus/hakkadict":
+                data_len_half = len(data) // 2
+                data = data.map(
+                    lambda _, i: {"speaker_id": i // data_len_half}, with_indices=True, num_proc=self.datasets_num_proc
+                )
+
+            if dataset_name == "formocorpus/hakkaradio_news":
+                speakers = data.unique("speaker")
+                speaker2id = {speaker: i for i, speaker in enumerate(speakers)}
+                data = data.map(
+                    lambda example: {"speaker_id": speaker2id[example["speaker"]]}, num_proc=self.datasets_num_proc
+                )
+            
 
         # self.data = TTSDataset.filter_files(data, ignore_file, min_duration, max_duration, total_duration)
         self.data = data
