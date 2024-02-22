@@ -38,7 +38,12 @@ def ipa_string_to_phoneme(ipa: str, tone_prefix=None, phoneme_sep=None) -> List[
 
     phonemes = []
 
-    for phoneme_with_tone in ipa.split(' '):
+    ipa_list = re.split(r"(?<![， ])(?=[， ])|(?<=[， ])(?![， ])", ipa)
+
+    for phoneme_with_tone in ipa_list:
+        if phoneme_with_tone in [" ", "，"]:
+            phonemes.append(phoneme_with_tone)
+            continue
         split_phoneme_and_tone = phoneme_with_tone.split("_")
 
         if len(split_phoneme_and_tone) == 2:
@@ -51,7 +56,6 @@ def ipa_string_to_phoneme(ipa: str, tone_prefix=None, phoneme_sep=None) -> List[
             phonemes.extend(split_phoneme_and_tone[0]) # one phoneme
 
         # one phoneme
-        phonemes.append(' ')
 
     # Remove trailing space
     if phonemes[-1] == " ":
