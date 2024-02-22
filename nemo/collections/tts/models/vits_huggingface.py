@@ -14,6 +14,7 @@
 
 
 import contextlib
+from typing import List
 
 import omegaconf
 import torch
@@ -25,7 +26,12 @@ from torch.cuda.amp import autocast
 from torch.nn import functional as F
 
 from nemo.collections.tts.data.dataset import DistributedBucketSampler
-from nemo.collections.tts.losses.vits_losses import DiscriminatorLoss, FeatureMatchingLoss, GeneratorLoss, KlLoss
+from nemo.collections.tts.losses.vits_losses import (
+    DiscriminatorLoss,
+    FeatureMatchingLoss,
+    GeneratorLoss,
+    KlLoss,
+)
 from nemo.collections.tts.models.base import TextToWaveform
 from nemo.collections.tts.modules.vits_modules import MultiPeriodDiscriminator
 from nemo.collections.tts.parts.utils.helpers import (
@@ -36,7 +42,13 @@ from nemo.collections.tts.parts.utils.helpers import (
 )
 from nemo.collections.tts.torch.tts_data_types import SpeakerID
 from nemo.core.classes.common import PretrainedModelInfo, typecheck
-from nemo.core.neural_types.elements import AudioSignal, FloatType, Index, IntType, TokenIndex
+from nemo.core.neural_types.elements import (
+    AudioSignal,
+    FloatType,
+    Index,
+    IntType,
+    TokenIndex,
+)
 from nemo.core.neural_types.neural_type import NeuralType
 from nemo.core.optim.lr_scheduler import CosineAnnealing
 from nemo.utils import logging, model_utils
@@ -325,23 +337,23 @@ class VitsModel(TextToWaveform):
             specs += [
                 wandb.Image(
                     plot_spectrogram_to_numpy(mel[0, :, : mel_lengths[0]].data.cpu().numpy()),
-                    caption=f"val_mel_target",
+                    caption="val_mel_target",
                 ),
                 wandb.Image(
                     plot_spectrogram_to_numpy(audio_pred_mel[0, :, : audio_pred_mel_len[0]].data.cpu().numpy()),
-                    caption=f"val_mel_predicted",
+                    caption="val_mel_predicted",
                 ),
             ]
 
             audios += [
                 wandb.Audio(
                     audio[0, : audio_len[0]].data.cpu().to(torch.float).numpy(),
-                    caption=f"val_wav_target",
+                    caption="val_wav_target",
                     sample_rate=self._cfg.sample_rate,
                 ),
                 wandb.Audio(
                     audio_pred[0, : audio_pred_len[0]].data.cpu().to(torch.float).numpy(),
-                    caption=f"val_wav_predicted",
+                    caption="val_wav_predicted",
                     sample_rate=self._cfg.sample_rate,
                 ),
             ]
@@ -393,7 +405,7 @@ class VitsModel(TextToWaveform):
         pass
 
     @classmethod
-    def list_available_models(cls) -> 'List[PretrainedModelInfo]':
+    def list_available_models(cls) -> List[PretrainedModelInfo]:
         list_of_models = []
         model = PretrainedModelInfo(
             pretrained_model_name="tts_en_lj_vits",
@@ -413,7 +425,8 @@ class VitsModel(TextToWaveform):
         return list_of_models
 
     @typecheck(
-        input_types={"tokens": NeuralType(('B', 'T_text'), TokenIndex(), optional=True),},
+        input_types={"tokens": NeuralType(('B', 'T_text'), TokenIndex(), optional=True),
+                     "speakers": NeuralType(('B',), Index(), optional=True),},
         output_types={"audio": NeuralType(('B', 'T_audio'), AudioSignal())},
     )
     def convert_text_to_waveform(self, *, tokens, speakers=None):
