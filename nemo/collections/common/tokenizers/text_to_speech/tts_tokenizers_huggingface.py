@@ -182,6 +182,8 @@ class HakkaPhonemesTokenizer(BaseTokenizer):
 
         if " " in tokens:
             tokens.remove(" ")
+        if "，" in tokens:
+            tokens.remove("，")
                     
         return sorted(tokens)
 
