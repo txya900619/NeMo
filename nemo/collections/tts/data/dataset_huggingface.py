@@ -85,6 +85,7 @@ class TTSDataset(Dataset):
     def __init__(
         self,
         dataset_name: str,
+        config_name: str,
         split_name: str,
         sample_rate: int,
         text_tokenizer: Union[BaseTokenizer, Callable[[str], List[int]]],
@@ -122,6 +123,7 @@ class TTSDataset(Dataset):
         Arguments for supplementary data should be also specified in this class, and they will be used from kwargs (see keyword args section).
         Args:
             dataset_name (str): Name of the dataset.
+            config_name (str): Name of the config.
             split_name (str): Name of the split.
             sample_rate (int): The sample rate of the audio. Or the sample rate that we will resample all files to.
             text_tokenizer (Optional[Union[BaseTokenizer, Callable[[str], List[int]]]]): BaseTokenizer or callable which represents text tokenizer.
@@ -216,9 +218,9 @@ class TTSDataset(Dataset):
             text_normalizer_call_kwargs if text_normalizer_call_kwargs is not None else {}
         )
 
-        data: datasets.Dataset = load_dataset(dataset_name, split=split_name)
+        data: datasets.Dataset = load_dataset(dataset_name, config_name, split=split_name)
 
-        data = data.filter(lambda example: example["ipa"] is not None, num_proc=self.datasets_num_proc)
+        data = data.filter(lambda example: example["ipa"] is not None and "<OOV>" not in example["ipa"], num_proc=self.datasets_num_proc)
 
         tag_regex = re.compile(r"<\S*>")
         data = data.filter(lambda example: tag_regex.search(example["ipa"]) is None, num_proc=self.datasets_num_proc)
@@ -258,7 +260,7 @@ class TTSDataset(Dataset):
                     lambda _, i: {"speaker_id": i // data_len_half}, with_indices=True, num_proc=self.datasets_num_proc
                 )
 
-            if dataset_name == "formocorpus/hakkaradio_news":
+            if dataset_name == "formocorpus/hakkaradio_news" or dataset_name == "formocorpus/hat_tts":
                 speakers = data.unique("speaker")
                 speaker2id = {speaker: i for i, speaker in enumerate(speakers)}
                 data = data.map(

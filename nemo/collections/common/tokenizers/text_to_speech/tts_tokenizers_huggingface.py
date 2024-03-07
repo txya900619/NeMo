@@ -18,23 +18,28 @@ from typing import List
 
 from datasets import load_dataset
 
-from nemo.collections.common.tokenizers.text_to_speech.tokenizer_utils import chinese_text_preprocessing
-from nemo.collections.common.tokenizers.text_to_speech.tts_tokenizers import BaseTokenizer
+from nemo.collections.common.tokenizers.text_to_speech.tokenizer_utils import (
+    chinese_text_preprocessing,
+)
+from nemo.collections.common.tokenizers.text_to_speech.tts_tokenizers import (
+    BaseTokenizer,
+)
 from nemo.utils import logging
+
 
 def ipa_string_to_phoneme(ipa: str, tone_prefix=None, phoneme_sep=None) -> List[str]:
     """Converts an IPA string to a list of phonemes and tones.
-        Args:
-            ipa: IPA string, e.g. "a_24 t͡ɕ i_31"
-            tone_prefix: Prefix for tone symbols, e.g. "#" for "#24" and "#31"
-            phoneme_sep: if not None, replace this special character with space before splitting
-        Examples: "a_24 t͡ɕ i_31" -> ["a", "#24", " ", "t", "͡", "ɕ", " ", "i", "#31"] (if tone_prefix is "#")
+    Args:
+        ipa: IPA string, e.g. "a_24 t͡ɕ i_31"
+        tone_prefix: Prefix for tone symbols, e.g. "#" for "#24" and "#31"
+        phoneme_sep: if not None, replace this special character with space before splitting
+    Examples: "a_24 t͡ɕ i_31" -> ["a", "#24", " ", "t", "͡", "ɕ", " ", "i", "#31"] (if tone_prefix is "#")
     """
     if tone_prefix is None:
         tone_prefix = ""
 
     if phoneme_sep is not None:
-        ipa = ipa.replace(phoneme_sep, ' ')
+        ipa = ipa.replace(phoneme_sep, " ")
 
     phonemes = []
 
@@ -49,11 +54,11 @@ def ipa_string_to_phoneme(ipa: str, tone_prefix=None, phoneme_sep=None) -> List[
         if len(split_phoneme_and_tone) == 2:
             phoneme, tone = split_phoneme_and_tone
             # phonemes.append(phoneme)
-            phonemes.extend(phoneme) # one phoneme
+            phonemes.extend(phoneme)  # one phoneme
             phonemes.append(f"{tone_prefix}{tone}")
         else:
             # phonemes.append(split_phoneme_and_tone[0])
-            phonemes.extend(split_phoneme_and_tone[0]) # one phoneme
+            phonemes.extend(split_phoneme_and_tone[0])  # one phoneme
 
         # one phoneme
 
@@ -76,6 +81,7 @@ class HakkaPhonemesTokenizer(BaseTokenizer):
     def __init__(
         self,
         dataset_name=None,
+        config_name=None,
         split_name=None,
         punct=True,
         non_default_punct_list=None,
@@ -122,8 +128,8 @@ class HakkaPhonemesTokenizer(BaseTokenizer):
         if tokens_path is not None:
             with open(tokens_path, "r", encoding="utf-8") as f:
                 tokens = f.read().splitlines()
-        elif dataset_name is not None and split_name is not None:
-            tokens.extend(self.generate_tokens(dataset_name, split_name))
+        elif dataset_name is not None and config_name is not None:
+            tokens.extend(self.generate_tokens(dataset_name, config_name, split_name))
 
             self.text_preprocessing_func = text_preprocessing_func
 
@@ -147,17 +153,17 @@ class HakkaPhonemesTokenizer(BaseTokenizer):
 
         self.punct = punct
         self.pad_with_space = pad_with_space
-    
-    def generate_tokens(self, dataset_name, split_name):
+
+    def generate_tokens(self, dataset_name, config_name, split_name):
         """Generate the phoneme list and tone list for the given dataset."""
         # Load the dataset
-        dataset = load_dataset(dataset_name, split=split_name)
+        dataset = load_dataset(dataset_name, config_name, split=split_name)
         
         # Only keep the ipa column
         dataset = dataset.select_columns("ipa")
 
         # tag_regex = re.compile(r"<\S*>")
-        dataset = dataset.filter(lambda example: example["ipa"] is not None, num_proc=self.datasets_num_proc)
+        dataset = dataset.filter(lambda example: example["ipa"] is not None and "<OOV>" not in example["ipa"], num_proc=self.datasets_num_proc)
 
         # Examples: "a_24 t͡ɕ i_31" -> ["a", "#24", " ", "t", "͡", "ɕ", " ", "i", "#31"]] (if tone_prefix is "#")
         dataset = dataset.map(
